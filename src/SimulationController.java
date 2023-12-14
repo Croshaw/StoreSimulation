@@ -9,18 +9,19 @@ import store_api.store.SuperStore;
 import store_api.util.FileHelper;
 import store_api.util.Pair;
 
-import java.time.*;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Random;
+import java.time.DayOfWeek;
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.*;
 
 public class SimulationController {
+    public static final String curPath = System.getProperty("user.dir");
     private Random random;
     private boolean isSimpleStore;
     private final Store store;
     private long seed;
     private HashMap<DayOfWeek, Float> flowDensityByDay;
-    private LocalDateTime lastCreatedReceiptDateTime;
     private final long secondsStep;
     private final Duration durationSimulation;
     public SimulationController(long seed, long secondsStep, Duration durationSimulation) {
@@ -46,12 +47,10 @@ public class SimulationController {
         flowDensityByDay.put(DayOfWeek.SATURDAY, .6f);
         flowDensityByDay.put(DayOfWeek.SUNDAY, .6f);
 
-        lastCreatedReceiptDateTime = LocalDateTime.of(LocalDate.now(), LocalTime.of(0,0,0));
-
         if(isSimpleStore)
                 store = new SimpleStore(workSchedule, 7000);
         else
-            store = new SuperStore(workSchedule, random.nextInt(5, 9), 3, 7000);
+            store = new SuperStore(workSchedule, random.nextInt(5, 9), 7000);
         generateEmployees();
         preGenerateProducts();
     }
@@ -61,55 +60,68 @@ public class SimulationController {
         int countEmployees = random.nextInt(1, 8-store.getCountOfEmployees());
         if(isSimpleStore) {
             for (int i = 0; i < countEmployees; i++) {
-                store.hire(new Salesman(FileHelper.getRandomString("surnames.txt", random),
-                        FileHelper.getRandomString("names.txt", random),
-                        FileHelper.getRandomString("patronymics.txt", random),
-                        Duration.ofDays(random.nextLong(1, 8)), store::fire));
+                store.hire(new Salesman(FileHelper.getRandomString("%s\\src\\surnames.txt".formatted(curPath), random),
+                        FileHelper.getRandomString("%s\\src\\names.txt".formatted(curPath), random),
+                        FileHelper.getRandomString("%s\\src\\patronymics.txt".formatted(curPath), random),
+                        Duration.ofDays(random.nextLong(1, 9)), store::fire));
             }
         } else {
             for (int i = 0; i < countEmployees; i++) {
-                store.hire(new Employee(FileHelper.getRandomString("surnames.txt", random),
-                        FileHelper.getRandomString("names.txt", random),
-                        FileHelper.getRandomString("patronymics.txt", random)));
+                store.hire(new Employee(FileHelper.getRandomString("%s\\src\\surnames.txt".formatted(curPath), random),
+                        FileHelper.getRandomString("%s\\src\\names.txt".formatted(curPath), random),
+                        FileHelper.getRandomString("%s\\src\\patronymics.txt".formatted(curPath), random)));
             }
         }
     }
     private void preGenerateProducts() {
         int countProducts = random.nextInt(10, 31);
         for(int i = 0;i < countProducts; i++) {
-            if(!store.addProduct(Product.getProductFromString(FileHelper.getRandomString("products.txt", random), random)))
+            if(!store.addProduct(Product.getProductFromString(FileHelper.getRandomString("%s\\src\\products.txt".formatted(curPath), random), random)))
                 i--;
         }
     }
-    private void generateStoreReceipt() {
+    private Deque<Pair<LocalDateTime, StoreReceipt>> preGenerateStoreReceipts() {
+        Deque<Pair<LocalDateTime, StoreReceipt>> storeReceipts = new ArrayDeque<>();
+        LocalDateTime startDateTime = store.getCurrentDateTime();
+        Duration currentDuration = store.getCurrentDuration();
         Duration from = Duration.ZERO;
         Duration to = Duration.ofMinutes(30);
-        Duration randDur = Duration.ofSeconds(random.nextLong(from.getSeconds(), to.getSeconds()+1));
-        while(!store.isWork(lastCreatedReceiptDateTime) && store.isWork()) {
-            lastCreatedReceiptDateTime = lastCreatedReceiptDateTime.plusSeconds(600);
-        }
-        if(Duration.between(store.getCurrentDateTime(), lastCreatedReceiptDateTime).compareTo(randDur) > 0) {
-            lastCreatedReceiptDateTime = lastCreatedReceiptDateTime.plus(randDur);
-            StoreReceipt storeReceipt = new StoreReceipt(new Buyer(FileHelper.getRandomString("surnames.txt", random),
-                    FileHelper.getRandomString("names.txt", random),
-                    FileHelper.getRandomString("patronymics.txt", random)), Duration.ofMinutes(random.nextInt(1, 8)));
+        while(currentDuration.compareTo(durationSimulation) < 1) {
+            if(!store.isWork(startDateTime.plus(currentDuration))) {
+                currentDuration = currentDuration.plusHours(1);
+                continue;
+            }
+            Duration randDur = Duration.ofSeconds(random.nextLong(from.getSeconds(), to.getSeconds() + 1));
+            currentDuration = currentDuration.plus(randDur);
+            StoreReceipt storeReceipt = new StoreReceipt(new Buyer(FileHelper.getRandomString("%s\\src\\surnames.txt".formatted(curPath), random),
+                    FileHelper.getRandomString("%s\\src\\names.txt".formatted(curPath), random),
+                    FileHelper.getRandomString("%s\\src\\patronymics.txt".formatted(curPath), random)), Duration.ofMinutes(random.nextInt(1, 8)));
             double randPriceReceipt = random.nextDouble(30, 9001);
             ArrayList<Product> products = new ArrayList<>();
             products.addAll(store.getProducts());
-            while(storeReceipt.getTotalPrice() < randPriceReceipt) {
+            while (storeReceipt.getTotalPrice() < randPriceReceipt) {
                 storeReceipt.addProduct(products.get(random.nextInt(0, products.size())));
             }
-            store.addToQueue(storeReceipt);
+            storeReceipts.offerLast(new Pair<>(startDateTime.plus(currentDuration), storeReceipt));
         }
+        return storeReceipts;
     }
+
     public void simulate() {
-        while(durationSimulation.compareTo(store.getCurrentDuration()) > 0) {
+        Deque<Pair<LocalDateTime, StoreReceipt>> storeReceipts = preGenerateStoreReceipts();
+        while(!isDone()) {
+            if(storeReceipts.isEmpty())
+                storeReceipts = preGenerateStoreReceipts();
             if(store.isWork()) {
+                Duration durOffset = Duration.ofSeconds((long) ((1 / store.getReputation() - 1) * 1544.872));
+                while(storeReceipts.getFirst().getFirst().plus(durOffset).isBefore(store.getCurrentDateTime())) {
+                    store.addToQueue(storeReceipts.pollFirst().getSecond());
+                    durOffset = Duration.ofSeconds((long) ((1 / store.getReputation() - 1) * 1544.872));
+                }
                 if (random.nextFloat() > 0.8)
                     store.startAdvertising();
                 if (random.nextFloat() > 0.8)
                     store.startDiscounts(random);
-                generateStoreReceipt();
                 if (isSimpleStore && (random.nextFloat() > 0.88 || store.getCountOfEmployees() < 1)) {
                     generateEmployees();
                 }
@@ -117,5 +129,15 @@ public class SimulationController {
             store.iterDiscounts(secondsStep);
             store.work(secondsStep);
         }
+
+    }
+    public boolean isDone() {
+        return store.getCurrentDuration().compareTo(durationSimulation) >= 0;
+    }
+
+    public String getReport() {
+        if(store == null)
+            return "";
+        return store.toString();
     }
 }

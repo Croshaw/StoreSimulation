@@ -1,13 +1,9 @@
-import java.util.Random;
+import java.time.Duration;
 
 public class Main {
     public static void main(String[] args) {
-        Random random = new Random(5);
-        int max = 5;
-        int min = 2;
-        while(true) {
-            //System.out.println(random.nextInt((max - min)+1)+min);
-            System.out.println(random.nextFloat()% .3f);
-        }
+        SimulationController simulationController = new SimulationController(123455, 360, Duration.ofDays(7));
+        simulationController.simulate();
+        System.out.println(simulationController.getReport());
     }
 }

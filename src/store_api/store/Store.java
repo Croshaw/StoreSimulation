@@ -3,6 +3,8 @@ package store_api.store;
 import store_api.Product;
 import store_api.StoreReceipt;
 import store_api.human.Employee;
+import store_api.human.Salesman;
+import store_api.util.DurationUtils;
 import store_api.util.Pair;
 
 import java.time.*;
@@ -18,24 +20,24 @@ public class Store {
     private final HashSet<Employee> employees;
     private final ArrayList<Employee> fireEmployees;
     private final HashSet<Product> products;
+    private final HashMap<LocalDate, Integer> numbersOfLostBuyers;
     private final int maxQueueLength;
-    private final int maxDifferenceBetweenMaxAndMinQueue;
     private float reputation;
     private final double costAdvertising;
     private int countAdvertising;
-    public Store(HashMap<DayOfWeek, Pair<LocalTime, Duration>> workSchedule, int maxQueueLength, int maxDifferenceBetweenMaxAndMinQueue, double costAdvertising) {
+    public Store(HashMap<DayOfWeek, Pair<LocalTime, Duration>> workSchedule, int maxQueueLength, double costAdvertising) {
         this.workSchedule = workSchedule;
         employees = new HashSet<>();
         fireEmployees = new ArrayList<>();
         this.maxQueueLength = maxQueueLength;
-        this.maxDifferenceBetweenMaxAndMinQueue = maxDifferenceBetweenMaxAndMinQueue;
         createdDateTime = LocalDateTime.of(LocalDate.now(), LocalTime.of(0,0,0,0));
         currentDuration = Duration.ZERO;
         products = new HashSet<>();
         reputation = 1f;
         this.costAdvertising = costAdvertising;
         countAdvertising = 0;
-            }
+        numbersOfLostBuyers = new HashMap<>();
+    }
     public boolean startAdvertising() {
         if(getTotalProfit() - (countAdvertising+1)*costAdvertising > 0){
             countAdvertising++;
@@ -52,9 +54,7 @@ public class Store {
         ArrayList<Product> products1 = new ArrayList<>(products);
         for(int i = 0; i < countOfProducts; i++) {
             Product product = products1.get(random.nextInt(0, products.size()));
-            if(product.isDiscount())
-                i--;
-            else
+            if(!product.isDiscount())
                 product.setDiscount(1f - (random.nextFloat() % .5f), duration);
         }
     }
@@ -71,18 +71,29 @@ public class Store {
     public boolean addToQueue(StoreReceipt storeReceipt) {
         Employee minEmployee = getEmployeeWithMinQueueLength();
         if(minEmployee != null && minEmployee.getQueueLength() < maxQueueLength)
-            return minEmployee.addToQueue(storeReceipt);
+            return minEmployee.addToQueue(storeReceipt, getCurrentDate());
         else {
             if(reputation > .2f)
                 reputation -= .2f;
+            if(!numbersOfLostBuyers.containsKey(getCurrentDate()))
+                numbersOfLostBuyers.put(getCurrentDate(), 0);
+            numbersOfLostBuyers.put(getCurrentDate(), numbersOfLostBuyers.remove(getCurrentDate())+1);
         }
         return false;
     }
     public void work(long secondsStep) {
         currentDuration = currentDuration.plusSeconds(secondsStep);
         if(isWork()) {
-            for (var employee : employees)
+            ArrayList<Employee> shouldBeFire = new ArrayList<>();
+            for (var employee : employees) {
+                if(employee instanceof Salesman salesman)
+                    if(salesman.shouldBeFire()) {
+                        shouldBeFire.add(salesman);
+                        continue;
+                    }
                 employee.work(secondsStep, getCurrentDateTime());
+            }
+            shouldBeFire.forEach(this::fire);
         } else {
             for (var employee : employees)
                 employee.finalize(getCurrentDateTime());
@@ -151,5 +162,105 @@ public class Store {
     }
     public Duration getCurrentDuration() {
         return currentDuration;
+    }
+    private int getTotalNumberServedBuyers() {
+        int c = 0;
+        for(var employee : employees)
+            c += employee.getTotalNumberServedBuyers();
+        for(var employee : fireEmployees)
+            c += employee.getTotalNumberServedBuyers();
+        return c;
+    }
+    private int getTotalNumberLostBuyers() {
+        int c = 0;
+        for(var temp : numbersOfLostBuyers.values())
+            c += temp;
+        return c;
+    }
+    public int getAverageQueuesLength() {
+        int avg = 0;
+        if(!employees.isEmpty()) {
+            for (var employee : employees)
+                avg += employee.getAverageQueueLength();
+            avg /= employees.size();
+        }
+        if(!fireEmployees.isEmpty()) {
+            int avg2 = 0;
+            for (var employee : fireEmployees)
+                avg2 += employee.getAverageQueueLength();
+            avg2 /= fireEmployees.size();
+            return (avg+avg2)/2;
+        }
+        return avg;
+    }
+    protected int getFireEmployeesCount() {
+        return fireEmployees.size();
+    }
+    public Duration getAverageWaitingDurationInQueues() {
+        Duration avgDuration = Duration.ZERO;
+        int count = 0;
+        for(var employee : employees) {
+            Duration temp = employee.getAverageWaitingDurationInQueue();
+            if(temp.compareTo(Duration.ZERO) == 0)
+                continue;
+            avgDuration = avgDuration.plus(temp);
+            count++;
+        }
+        for(var employee : fireEmployees) {
+            Duration temp = employee.getAverageWaitingDurationInQueue();
+            if(temp.compareTo(Duration.ZERO) == 0)
+                continue;
+            avgDuration = avgDuration.plus(temp);
+            count++;
+        }
+
+        if(count > 0)
+            avgDuration = avgDuration.dividedBy(count);
+
+        return avgDuration;
+    }
+    public Duration getAverageTimeSpent() {
+        Duration avgDuration = Duration.ZERO;
+        int count = 0;
+        for(var employee : employees) {
+            Duration temp = employee.getAverageTimeSpent();
+            if(temp.compareTo(Duration.ZERO) == 0)
+                continue;
+            avgDuration = avgDuration.plus(temp);
+            count++;
+        }
+        for(var employee : fireEmployees) {
+            Duration temp = employee.getAverageTimeSpent();
+            if(temp.compareTo(Duration.ZERO) == 0)
+                continue;
+            avgDuration = avgDuration.plus(temp);
+            count++;
+        }
+
+        if(count > 0)
+            avgDuration = avgDuration.dividedBy(count);
+
+        return avgDuration;
+    }
+    @Override
+    public String toString() {
+        StringBuilder stringBuilder = new StringBuilder();
+
+        stringBuilder.append("Кол-во обслуженных покупателей за всё время: %d\n".formatted(getTotalNumberServedBuyers()));
+
+        stringBuilder.append("Кол-во потерянных покупателей за всё время: %d\n".formatted(getTotalNumberLostBuyers()));
+
+        stringBuilder.append("Средняя длина очереди: %d\n".formatted(getAverageQueuesLength()));
+        //stringBuilder.append("Среднее время обслуживания: %s\n".formatted(getAverageServiceDuration()));
+
+        stringBuilder.append("Среднее время ожидания в очереди: %s\n".formatted(DurationUtils.toString(getAverageWaitingDurationInQueues())));
+
+        stringBuilder.append("Средняя занятость персонала: %s\n".formatted(DurationUtils.toString(getAverageTimeSpent())));
+
+        stringBuilder.append("Затраты на рекламу: %.2f руб.\n".formatted(costAdvertising*countAdvertising));
+
+        stringBuilder.append("Общая прибыль: %.2f руб.\n".formatted(getTotalProfit()));
+
+        return stringBuilder.toString();
     }
 }
