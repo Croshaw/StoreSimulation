@@ -1,0 +1,150 @@
+@startuml
+class People {
+- name : String
+- surname : String
+- patronymic : String
++ getName() : String
++ getSurname() : String
++ getPatronymic() : String
++ setName(value : String) : void
++ setSurname(value : String) : void
++ setPatronymic(value : String) : void
++ toString() : String
+}
+class Employee {
+- currentDuration : Duration
+- currentTask : StoreReceipt
+- timeSpentMap : Map<LocalDate, Duration>
+- salaryMap : Map<LocalDate, Double>
+- currentStoreReceiptsQueue : Queue<StoreReceipt>
+- completedStoreReceipts : Map<LocalDate, ArrayList<StoreReceipt>>
+- dropStoreReceipts : Map<LocalDate, ArrayList<StoreReceipt>>
+- averageQueueSize : Map<LocalDate, Pair<Integer,Integer>>
+- dailySalary : double
++ addToQueue(storeReceipt : StoreReceipt, date : LocalDate) : boolean
++ freeQueue(LocalDate date) : void
++ pay(date : LocalDate) : void
++ getPaymentByDate(date : LocalDate) : double
++ getTotalSalary() : double
++ work(secondsStep : long, dateTime : LocalDateTime) : void
+- work(secondsStep : long, dateTime : LocalDateTime, isFinalize : boolean) : void
++ finalize(dateTime : LocalDateTime) : void
++ getQueueLength() : int
++ isServe() : boolean
++ getTotalNumberServedBuyers() : int
++ getTotalProfitByDate(date : LocalDate) : double
++ getTotalProfit() : double
++ getAverageWaitingDurationInQueue() : Duration
++ getAverageTimeSpent() : Duration
++ getAverageQueueLength() : int
++ getCurrentTask() : StoreReceipt
++ getQueue() : Queue<StoreReceipt>
++ getCurrentDuration() : Duration
++ toString() : String
+}
+class Salesman {
+- durationOfHire : Duration
++ shouldBeFire() : boolean
++ toString() : String
+}
+class Buyer {
+
+}
+
+class Product {
+- name : String
+- price : double
+- priceMultiplier : float
+- durationDiscount : Duration
+- currentDurationDiscount : Duration
++ getName() : String
++ getPrice() : double
++ getFinalPrice() : double
++ setPrice(price : double) : double
++ getPriceMultiplier() : float
++ setPriceMultiplier(priceMultiplier : float) : void
++ setDiscount(priceMultiplier : float, durationDiscount : Duration) : void
++ life(secondsStep : long) : void
++ resetDiscount() : void
++ isDiscount() : boolean
++ toString() : String
+}
+
+class StoreReceipt {
+- fixitPrice : double
+- buyer : Buyer
+- durationService : Duration
+- currentDurationService : Duration
+- waitingDuration : Duration
+- products : ArrayList<Pair<Product, Integer>>
++ getBuyer() : Buyer
++ life(secondsStep : long) : void
++ addProduct(product : Product) : void
++ getTotalPrice() : double
++ fixPrice() : void
++ getSeviceDuration() : Duration
++ getWaitingDuration() : Duration
++ isDone() : boolean
++ toString() : String
+}
+
+
+class Store {
+- workSchedule : HashMap<DayOfWeak, Pair<LocalTime, Duration>>
+- createdDateTime : LocalDateTime
+- currentDuration : Duration
+- employees : HashSet<Employee>
+- fireEmployees : ArrayList<Employee>
+- products : HashSet<Product>
+- numbersOfLostBuyers : HashMap<LocalDate, Integer>
+- maxQueueLength : int
+- reputation : float
+- costAdvertising : double
+- countAdvertising : int
+- maxEmployeeCount : int
++ startAdvertising() : boolean
++ startDiscounts(random : Random) : void
++ hire(employee : T) : boolean
++ fire(employee : T) : boolean
++ addToQueue(storeReceipt : StoreReceipt) : boolean
++ work(secondsStep : long) : void
++ getEmployeeWithMinQueueLength() : Employee
++ getEmployeeWithMaxQueueLength() : Employee
++ iterDiscounts(secondsStep : long) : void
++ isWork() : boolean
++ isWork(dateTime : LocalDateTime) : boolean
++ getCurrentDateTime() : LocalDateTime
++ getCurrentDate() : LocalDate
++ getReputation() : float
++ addProduct(product : Product) : boolean
++ getProducts() : HashSet<Product>
++ getTotalProfit() : double
++ getCountOfEmployees() : int
++ getCurrentDuration() : Duration
++ getTotalNumberServedBuyers() : int
++ getTotalNumberLostBuyers() : int
++ getAverageQueuesLength() : int
++ getFireEmployeesCount() : int
++ getAverageWaitingDurationInQueues() : Duration
++ getAverageTimeSpent() : Duration
++ getEmployees() : HashSet<Employee>
++ getMaxEmployeesCount() : int
++ getMaxQueueLength() : int
++ toString() : String
+}
+
+class SimpleStore {
++ toString() : String
+}
+
+class SuperStore {
++ toString() : String
+}
+
+People <-- Employee
+Employee <-- Salesman
+Employee <-- Cashier
+People <--Buyer
+Store <-- SimpleStore
+Store <-- SuperStore
+@enduml

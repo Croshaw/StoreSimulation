@@ -30,6 +30,9 @@ public class Drawer<T, F extends Drawer> {
         childrens = new LinkedList<>();
         drawTooltip = false;
     }
+    public Rectangle getRectangle() {
+        return rectangle;
+    }
     public boolean mouseMovedEvent(MouseEvent event) {
         for(var child : childrens) {
             if(child.mouseMovedEvent(event)) {
@@ -95,27 +98,6 @@ public class Drawer<T, F extends Drawer> {
         childrens.forEach(x-> x.drawTooltip(g));
         if(source != null && drawTooltip) {
             drawTextOnBackground(g, mouseX, mouseY, Color.WHITE, Color.BLACK, source.toString());
-//            String toOut = source.toString();
-//
-//            double x = mouseX + 10;//rectangle.getX()+rectangle.getWidth()+10;
-//            double y = mouseY + 10;//rectangle.getY()+10;
-//
-//            double width = computeTextWidth(g.getFont(), toOut)+15;
-//            double height = computeTextHeight(g.getFont(), toOut);
-//
-//            Canvas c = g.getCanvas();
-//            if(x + width > c.getWidth()) {
-//                x = mouseX - width - 10;
-//            }
-//            if(y + height > c.getHeight()) {
-//                y = mouseY - height;
-//            }
-//            g.setFill(Color.BLACK);
-//            g.fillRoundRect(x, y, width, height, 20, 20);
-//
-//            g.setFill(Color.WHITE);
-//            g.fillText(toOut, x + 15/2, y+15);
-
         }
     }
     public void move(double toX, double toY) {
@@ -152,7 +134,7 @@ public class Drawer<T, F extends Drawer> {
         double yy = y + 10;
 
         double width = computeTextWidth(g.getFont(), text)+15;
-        double height = computeTextHeight(g.getFont(), text);
+        double height = computeTextHeight(g.getFont(), text) + 10;
 
         Canvas c = g.getCanvas();
         if(xx + width > c.getWidth()) {

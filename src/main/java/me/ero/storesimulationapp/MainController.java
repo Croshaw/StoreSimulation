@@ -1,32 +1,20 @@
 package me.ero.storesimulationapp;
 
-import javafx.animation.TranslateTransition;
-import javafx.beans.property.IntegerProperty;
-import javafx.beans.property.SimpleIntegerProperty;
-import javafx.beans.value.ChangeListener;
-import javafx.beans.value.ObservableValue;
-import javafx.event.EventHandler;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.canvas.Canvas;
-import javafx.scene.control.*;
-import javafx.scene.input.KeyEvent;
-import javafx.scene.layout.Pane;
-import javafx.scene.paint.Color;
-import javafx.scene.shape.Rectangle;
-import javafx.util.StringConverter;
+import javafx.scene.control.Button;
+import javafx.scene.control.Label;
+import javafx.scene.control.Slider;
+import javafx.scene.control.TextField;
+import javafx.stage.FileChooser;
 import me.ero.storesimulationapp.simulation.SimulationController;
-import me.ero.storesimulationapp.simulation.store_api.util.DurationUtils;
 import me.ero.storesimulationapp.simulation.store_api.util.FileHelper;
 
-import java.math.BigDecimal;
+import java.io.File;
 import java.net.URL;
-import java.text.DecimalFormat;
-import java.text.ParseException;
-import java.text.ParsePosition;
 import java.time.Duration;
 import java.util.ResourceBundle;
-import java.util.function.UnaryOperator;
 
 public class MainController implements Initializable {
     private SimulationController simulationController;
@@ -64,6 +52,8 @@ public class MainController implements Initializable {
     public void initialize(URL url, ResourceBundle resourceBundle) {
         simulationStepSlider.valueProperty().addListener((observableValue, number, t1) -> {
             simulationStepSliderInfo.setText("%d мин".formatted(t1.intValue()));
+            if(simulationController != null)
+                simulationController.setStep(t1.longValue()*60);
         });
         speedSliderInfo.setText("%f".formatted(speedSlider.getValue()));
         speedSlider.valueProperty().addListener((observableValue, number, t1) -> {
@@ -73,9 +63,9 @@ public class MainController implements Initializable {
             speedSliderInfo.setText("%f".formatted(t1.doubleValue()));
         });
         seedField.textProperty().addListener((observable, oldValue, newValue) -> {
-                if (!newValue.matches("\\d*")) {
-                    seedField.setText(newValue.replaceAll("[^\\d]", ""));
-                }
+            if (!newValue.matches("\\d*")) {
+                seedField.setText(newValue.replaceAll("[^\\d]", ""));
+            }
         });
 
         durationSimulationField.textProperty().addListener((observable, oldValue, newValue) -> {
@@ -109,16 +99,16 @@ public class MainController implements Initializable {
     @FXML
     protected void saveSimulationController() {
         if(simulationController != null) {
-            simulationController.pause();
-            FileHelper.writeToFile("Temp.json", SimulationController.serialize(simulationController));
+            onPauseButtonClick();
+            FileChooser fileChooser = new FileChooser();
+            FileChooser.ExtensionFilter extFilter = new FileChooser.ExtensionFilter("Json files (*.json)", "*.json");
+            fileChooser.getExtensionFilters().add(extFilter);
+            File file = fileChooser.showSaveDialog(simulationCanvas.getScene().getWindow());
+            if(file != null)
+                FileHelper.writeToFile(file.getPath(), SimulationController.serialize(simulationController));
+            onPauseButtonClick();
         }
     }
-
-    @FXML
-    protected void loadSimulationController() {
-
-    }
-
     @FXML
     protected void fillDefaultButtonClick() {
         seedField.setText("0");

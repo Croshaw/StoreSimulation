@@ -6,13 +6,12 @@ import javafx.scene.paint.Color;
 import me.ero.storesimulationapp.simulation.store_api.human.Employee;
 import me.ero.storesimulationapp.simulation.store_api.util.Pair;
 
-import java.util.*;
+import java.util.ArrayList;
 
 public class EmployeeDrawer extends Drawer<Employee, StoreReceiptDrawer> {
     private StoreReceiptDrawer currentStoreReceiptDrawer;
     private final ArrayList<Pair<Double,Double>> coords;
     private final int maxQueueLength;
-    private Thread remThread;
     private final double sx;
     private final double sy;
     public EmployeeDrawer(Employee source, double sx, double sy, int maxQueueLength) {
@@ -25,11 +24,6 @@ public class EmployeeDrawer extends Drawer<Employee, StoreReceiptDrawer> {
         this.sy = sy;
         source.getQueue().forEach(x -> add(new StoreReceiptDrawer(x, sx, sy)));
         this.maxQueueLength = maxQueueLength;
-//        source.setCallbackable(() -> {
-//            currentStoreReceiptDrawer = childrens.getFirst();
-//            currentStoreReceiptDrawer.move(rectangle.getX() + (rectangle.getWidth() / 2 - currentStoreReceiptDrawer.rectangle.getWidth()/2),
-//                    rectangle.getY() + (rectangle.getHeight() - currentStoreReceiptDrawer.rectangle.getHeight()));
-//        });
     }
     @Override
     public void pause() {

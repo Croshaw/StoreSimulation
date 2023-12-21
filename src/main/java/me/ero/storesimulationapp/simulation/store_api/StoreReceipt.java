@@ -1,7 +1,6 @@
 package me.ero.storesimulationapp.simulation.store_api;
 
 
-import javafx.scene.shape.Rectangle;
 import me.ero.storesimulationapp.simulation.store_api.human.Buyer;
 import me.ero.storesimulationapp.simulation.store_api.util.DurationUtils;
 import me.ero.storesimulationapp.simulation.store_api.util.Pair;
@@ -90,12 +89,17 @@ public class StoreReceipt {
         sb.append("Время ожидания: %s\n".formatted(DurationUtils.toString(waitingDuration)));
         sb.append("Цена: %.2f\n".formatted(getTotalPrice()));
         sb.append("Продукты: ");
+        short s = 0;
         for(var product : products) {
-            sb.append("%s %d шт., ".formatted(product.getFirst().toString(), product.getSecond()));
+            if(s == 5) {
+                s = 0;
+                sb.append("\n");
+            }
+            sb.append("%s %d шт., ".formatted(product.getFirst().getName(), product.getSecond()));
+            s++;
         }
         sb.deleteCharAt(sb.length()-1);
         sb.deleteCharAt(sb.length()-1);
-        sb.append("\n");
         return sb.toString();
     }
 }

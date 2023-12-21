@@ -1,10 +1,5 @@
 package me.ero.storesimulationapp.simulation.store_api.store;
 
-import javafx.animation.AnimationTimer;
-import javafx.animation.TranslateTransition;
-import javafx.scene.layout.Pane;
-import javafx.scene.paint.Color;
-import javafx.scene.shape.Rectangle;
 import me.ero.storesimulationapp.simulation.store_api.Product;
 import me.ero.storesimulationapp.simulation.store_api.StoreReceipt;
 import me.ero.storesimulationapp.simulation.store_api.human.Employee;
@@ -13,8 +8,10 @@ import me.ero.storesimulationapp.simulation.store_api.util.DurationUtils;
 import me.ero.storesimulationapp.simulation.store_api.util.Pair;
 
 import java.time.*;
-import java.util.*;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Random;
 
 public class Store {
     private final HashMap<DayOfWeek, Pair<LocalTime, Duration>> workSchedule;
@@ -29,8 +26,15 @@ public class Store {
     private final double costAdvertising;
     private int countAdvertising;
     private final int maxEmployeeCount;
-    public Store(HashMap<DayOfWeek, Pair<LocalTime, Duration>> workSchedule, int maxQueueLength, double costAdvertising, int maxEmployeeCount) {
-        this.workSchedule = workSchedule;
+    public Store(int maxQueueLength, double costAdvertising, int maxEmployeeCount) {
+        workSchedule = new HashMap<>();
+        workSchedule.put(DayOfWeek.MONDAY, new Pair<>(LocalTime.of(8, 0, 0), Duration.ofHours(11)));
+        workSchedule.put(DayOfWeek.TUESDAY, new Pair<>(LocalTime.of(8, 0, 0), Duration.ofHours(11)));
+        workSchedule.put(DayOfWeek.WEDNESDAY, new Pair<>(LocalTime.of(8, 0, 0), Duration.ofHours(11)));
+        workSchedule.put(DayOfWeek.THURSDAY, new Pair<>(LocalTime.of(8, 0, 0), Duration.ofHours(11)));
+        workSchedule.put(DayOfWeek.FRIDAY, new Pair<>(LocalTime.of(8, 0, 0), Duration.ofHours(11)));
+        workSchedule.put(DayOfWeek.SATURDAY, new Pair<>(LocalTime.of(9, 0, 0), Duration.ofHours(9)));
+        workSchedule.put(DayOfWeek.SUNDAY, new Pair<>(LocalTime.of(10, 0, 0), Duration.ofHours(7)));
         employees = new HashSet<>();
         fireEmployees = new ArrayList<>();
         this.maxQueueLength = maxQueueLength;
@@ -87,8 +91,10 @@ public class Store {
         return false;
     }
     public void work(long secondsStep) {
+        LocalDateTime prevDateTime = getCurrentDateTime();
         currentDuration = currentDuration.plusSeconds(secondsStep);
-        if(isWork()) {
+        LocalDateTime curDateTime = getCurrentDateTime();
+        if(isWork(prevDateTime) && isWork(curDateTime)) {
             ArrayList<Employee> shouldBeFire = new ArrayList<>();
             for (var employee : employees) {
                 if(employee instanceof Salesman salesman)
@@ -99,12 +105,29 @@ public class Store {
                 employee.work(secondsStep, getCurrentDateTime());
             }
             shouldBeFire.forEach(this::fire);
-        } else {
+        } else if(isWork(prevDateTime) && !isWork(curDateTime)) {
+            ArrayList<Employee> shouldBeFire = new ArrayList<>();
+            for (var employee : employees) {
+                if(employee instanceof Salesman salesman)
+                    if(salesman.shouldBeFire()) {
+                        shouldBeFire.add(salesman);
+                        continue;
+                    }
+                employee.work(secondsStep, getCurrentDateTime());
+                employee.pay(getCurrentDate());
+            }
+            shouldBeFire.forEach(this::fire);
             for (var employee : employees)
                 employee.finalize(getCurrentDateTime());
+        } else if(!isWork(prevDateTime) && isWork(curDateTime)) {
+            var tempSchedule = workSchedule.get(prevDateTime.getDayOfWeek());
+            long dif = Math.abs(Duration.between(tempSchedule.getFirst(), prevDateTime).toSeconds());
+            employees.forEach(x-> x.work(secondsStep, getCurrentDateTime()));
+        } else {
+            employees.forEach(x-> x.freeQueue(curDateTime.toLocalDate()));
         }
     }
-    private Employee getEmployeeWithMinQueueLength() {
+    public Employee getEmployeeWithMinQueueLength() {
         Employee minEmployee = null;
         for(var employee : employees) {
             if(minEmployee == null || minEmployee.getQueueLength() > employee.getQueueLength())
@@ -112,7 +135,7 @@ public class Store {
         }
         return minEmployee;
     }
-    private Employee getEmployeeWithMaxQueueLength() {
+    public Employee getEmployeeWithMaxQueueLength() {
         Employee maxEmployee = null;
         for(var employee : employees) {
             if(maxEmployee == null || maxEmployee.getQueueLength() < employee.getQueueLength())
@@ -149,6 +172,9 @@ public class Store {
         return curRep;
     }
     public boolean addProduct(Product product) {
+        for(var pro : products)
+            if(pro.getName().equals(product.getName()))
+                return false;
         return products.add(product);
     }
     public HashSet<Product> getProducts() {
@@ -198,7 +224,7 @@ public class Store {
         }
         return avg;
     }
-    protected int getFireEmployeesCount() {
+    public int getFireEmployeesCount() {
         return fireEmployees.size();
     }
     public Duration getAverageWaitingDurationInQueues() {
@@ -265,7 +291,6 @@ public class Store {
         stringBuilder.append("Кол-во потерянных покупателей за всё время: %d\n".formatted(getTotalNumberLostBuyers()));
 
         stringBuilder.append("Средняя длина очереди: %d\n".formatted(getAverageQueuesLength()));
-        //stringBuilder.append("Среднее время обслуживания: %s\n".formatted(getAverageServiceDuration()));
 
         stringBuilder.append("Среднее время ожидания в очереди: %s\n".formatted(DurationUtils.toString(getAverageWaitingDurationInQueues())));
 
@@ -274,6 +299,7 @@ public class Store {
         stringBuilder.append("Затраты на рекламу: %.2f руб.\n".formatted(costAdvertising*countAdvertising));
 
         stringBuilder.append("Общая прибыль: %.2f руб.\n".formatted(getTotalProfit()));
+        stringBuilder.append("Репутация: %f".formatted(getReputation()));
 
         return stringBuilder.toString();
     }
